@@ -1,4 +1,7 @@
+use chrono::{Local, TimeZone};
 use anyhow::{Context, Result};
+use std::fmt;
+use colored::*;
 use config;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -35,18 +38,42 @@ pub struct Goal {
     slug: String,
     updated_at: i64,
     title: String,
-    roadall: Vec<(f64, Option<f64>, Option<f64>)>,
+    // roadall: Vec<(f64, Option<f64>, Option<f64>)>,
     delta: f64,
     headsum: String,
     limsum: String,
-    safebuf: Option<i32>,
+    pledge: f32,
+    lastday: i64, 
+    safebuf: i32,
     safebump: Option<f64>,
     tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct UpdateGoal {
-    roadall: Vec<(f64, Option<f64>, Option<f64>)>,
+impl Goal {
+    pub fn has_entry_today(&self) -> bool {
+        let lastday_datetime = Local.timestamp_opt(self.lastday, 0).unwrap().date_naive();
+        let today_datetime = Local::now().date_naive();
+        lastday_datetime == today_datetime
+    }
+}
+
+impl fmt::Display for Goal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let has_entry_today = if self.has_entry_today() { "✓" } else { "✗" };
+        let slug_padded = format!("{:20}", self.slug);
+
+        let color = match self.safebuf {
+            0 => Color::Red,
+            1 => Color::Yellow,
+            2 => Color::Blue,
+            3..=6 => Color::Green,
+            _ => Color::White,
+        };
+
+        let colored_output = format!("{} {} [{}]", has_entry_today, slug_padded, self.limsum).color(color);
+
+        write!(f, "{}", colored_output)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Default)]
@@ -60,11 +87,10 @@ pub struct DataPoint {
                                   preventing duplicates.*/
 }
 
-async fn add_datapoint(config: &Config, goal: &Goal, datapoint: &DataPoint) -> Result<()> {
-    let client = Client::new();
+async fn add_datapoint(client: &Client, config: &Config, goal_slug: &str, datapoint: &DataPoint) -> Result<()> {
     let url = format!(
         "{}/users/me/goals/{}/datapoints.json?auth_token={}",
-        BASE_URL, goal.slug, config.key
+        BASE_URL, goal_slug, config.key
     );
     let update_json = serde_json::to_string(&datapoint)?;
     let body = reqwest::Body::from(update_json);
@@ -79,36 +105,6 @@ async fn add_datapoint(config: &Config, goal: &Goal, datapoint: &DataPoint) -> R
     Ok(())
 }
 
-impl UpdateGoal {
-    pub fn from_goal(goal: &Goal) -> Self {
-        UpdateGoal {
-            roadall: goal.roadall.clone(),
-        }
-    }
-}
-
-async fn _update_goal(config: &Config, goal: &Goal) -> Result<()> {
-    let client = Client::new();
-    let url = format!(
-        "{}/users/me/goals/{}.json?auth_token={}",
-        BASE_URL, goal.slug, config.key
-    );
-    let update_goal = UpdateGoal::from_goal(goal);
-    let update_json = serde_json::to_string(&update_goal)?;
-    println!("Updating {}", goal.slug);
-    let body = reqwest::Body::from(update_json);
-    let resp = client
-        .put(&url)
-        .header("Content-Type", "application/json")
-        .body(body)
-        .send()
-        .await?;
-
-    let body = resp.text().await?;
-    println!("Response: {:?}", body);
-
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -123,20 +119,32 @@ async fn main() -> Result<()> {
         .with_context(|| format!("Could not read config."))?;
 
     let client = Client::new();
-    let url = format!("{}/users/me/goals.json?auth_token={}", BASE_URL, config.key);
-    let goals: Vec<Goal> = client.get(&url).send().await?.json().await?;
-
     let command = Command::from_args();
     match command {
         Command::List => {
+            let url = format!("{}/users/me/goals.json?auth_token={}", BASE_URL, config.key);
+            let mut goals: Vec<Goal> = client.get(&url).send().await?.json().await?;
+
+            goals.sort_by(|a, b| {
+                let today_cmp = a.has_entry_today().cmp(&b.has_entry_today());
+                if today_cmp != std::cmp::Ordering::Equal {
+                    return today_cmp;
+                }
+                
+                a.safebuf.cmp(&b.safebuf)
+            });
+
             for goal in goals {
-                println!{"{:?}", goal};
-                break;
-                println!("{} {} {}", goal.slug, goal.limsum, goal.delta);
+                println!("{}", goal);
             }
         }
         Command::Add { goal, value, comment } => {
-            // TODO: Implement adding a datapoint
+            let datapoint = DataPoint {
+                value,
+                comment: comment.map(String::from),
+                ..Default::default()
+            };
+            add_datapoint(&client, &config, &goal, &datapoint).await?;
         }
     }
 
