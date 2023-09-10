@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use config;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use structopt::StructOpt;
+
 
 const BASE_URL: &str = "https://www.beeminder.com/api/v1/";
 
@@ -9,6 +11,22 @@ const BASE_URL: &str = "https://www.beeminder.com/api/v1/";
 struct Config {
     key: String,
 }
+
+#[derive(StructOpt)]
+enum Command {
+    #[structopt(about = "List all goals")]
+    List,
+    #[structopt(about = "Add a datapoint")]
+    Add {
+        #[structopt(about = "The name of the goal")]
+        goal: String,
+        #[structopt(about = "The value of the datapoint")]
+        value: f64,
+        #[structopt(about = "An optional comment for the datapoint")]
+        comment: Option<String>,
+    },
+}
+
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
@@ -108,23 +126,17 @@ async fn main() -> Result<()> {
     let url = format!("{}/users/me/goals.json?auth_token={}", BASE_URL, config.key);
     let goals: Vec<Goal> = client.get(&url).send().await?.json().await?;
 
-    let to_update: Vec<(String, f64)> = vec![
-        ("detoxify-sugar".to_string(), -20.0),
-        ("detoxify-yt".to_string(), -3.0),
-    ];
-
-    for goal in goals {
-        // println!("{} {} {}", goal.slug, goal.limsum, goal.delta);
-        for (goal_slug, delta) in &to_update {
-            if goal.slug == *goal_slug && goal.delta < *delta {
-                println!("Ratchet {} to {}.", goal.slug, delta);
-                let d = DataPoint {
-                    value: delta - goal.delta,
-                    comment: Some("ratchet".to_string()),
-                    ..Default::default()
-                };
-                add_datapoint(&config, &goal, &d).await?;
+    let command = Command::from_args();
+    match command {
+        Command::List => {
+            for goal in goals {
+                println!{"{:?}", goal};
+                break;
+                println!("{} {} {}", goal.slug, goal.limsum, goal.delta);
             }
+        }
+        Command::Add { goal, value, comment } => {
+            // TODO: Implement adding a datapoint
         }
     }
 
