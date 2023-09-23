@@ -59,7 +59,7 @@ impl Goal {
 
 impl fmt::Display for Goal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let has_entry_today = if self.has_entry_today() { "✓" } else { "✗" };
+        let has_entry_today = if self.has_entry_today() { "✓" } else { " " };
         let slug_padded = format!("{:20}", self.slug);
 
         let color = match self.safebuf {
