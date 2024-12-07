@@ -1,12 +1,10 @@
-use chrono::{Local, TimeZone};
 use anyhow::{Context, Result};
-use std::fmt;
+use chrono::{Local, TimeZone};
 use colored::*;
-use config;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use structopt::StructOpt;
-
 
 const BASE_URL: &str = "https://www.beeminder.com/api/v1/";
 
@@ -30,7 +28,6 @@ enum Command {
     },
 }
 
-
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct Goal {
@@ -43,7 +40,7 @@ pub struct Goal {
     headsum: String,
     limsum: String,
     pledge: f32,
-    lastday: i64, 
+    lastday: i64,
     safebuf: i32,
     safebump: Option<f64>,
     tags: Vec<String>,
@@ -70,7 +67,8 @@ impl fmt::Display for Goal {
             _ => Color::White,
         };
 
-        let colored_output = format!("{} {} [{}]", has_entry_today, slug_padded, self.limsum).color(color);
+        let colored_output =
+            format!("{} {} [{}]", has_entry_today, slug_padded, self.limsum).color(color);
 
         write!(f, "{}", colored_output)
     }
@@ -83,11 +81,16 @@ pub struct DataPoint {
     daystamp: Option<String>, // Optional, timestamp takes precedence if both are included.
     comment: Option<String>,  // Optional.
     requestid: Option<String>, /* Optional unique id for datapoint, acts as an idempotency key.
-                                  Used for verifying if Beeminder received a datapoint and
-                                  preventing duplicates.*/
+                              Used for verifying if Beeminder received a datapoint and
+                              preventing duplicates.*/
 }
 
-async fn add_datapoint(client: &Client, config: &Config, goal_slug: &str, datapoint: &DataPoint) -> Result<()> {
+async fn add_datapoint(
+    client: &Client,
+    config: &Config,
+    goal_slug: &str,
+    datapoint: &DataPoint,
+) -> Result<()> {
     let url = format!(
         "{}/users/me/goals/{}/datapoints.json?auth_token={}",
         BASE_URL, goal_slug, config.key
@@ -105,18 +108,17 @@ async fn add_datapoint(client: &Client, config: &Config, goal_slug: &str, datapo
     Ok(())
 }
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let settings = config::Config::builder()
         .add_source(config::File::with_name("settings"))
         .add_source(config::Environment::with_prefix("BEELINE"))
         .build()
-        .with_context(|| format!("Could not load config."))?;
+        .with_context(|| "Could not load config.".to_string())?;
 
     let config = settings
         .try_deserialize::<Config>()
-        .with_context(|| format!("Could not read config."))?;
+        .with_context(|| "Could not read config.".to_string())?;
 
     let client = Client::new();
     let command = Command::from_args();
@@ -130,7 +132,7 @@ async fn main() -> Result<()> {
                 if today_cmp != std::cmp::Ordering::Equal {
                     return today_cmp;
                 }
-                
+
                 a.safebuf.cmp(&b.safebuf)
             });
 
@@ -138,7 +140,11 @@ async fn main() -> Result<()> {
                 println!("{}", goal);
             }
         }
-        Command::Add { goal, value, comment } => {
+        Command::Add {
+            goal,
+            value,
+            comment,
+        } => {
             let datapoint = DataPoint {
                 value,
                 comment: comment.map(String::from),
