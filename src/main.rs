@@ -1,12 +1,10 @@
 use anyhow::{Context, Result};
-use chrono::{Local, TimeZone};
-use colored::*;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::fmt;
+use beeminder::types::{CreateDatapoint, GoalSummary};
+use beeminder::BeeminderClient;
+use colored::{Color, Colorize};
+use serde::Deserialize;
 use structopt::StructOpt;
-
-const BASE_URL: &str = "https://www.beeminder.com/api/v1/";
+use time::{Duration, OffsetDateTime};
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -28,84 +26,27 @@ enum Command {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-pub struct Goal {
-    id: String,
-    slug: String,
-    updated_at: i64,
-    title: String,
-    // roadall: Vec<(f64, Option<f64>, Option<f64>)>,
-    delta: f64,
-    headsum: String,
-    limsum: String,
-    pledge: f32,
-    lastday: i64,
-    safebuf: i32,
-    safebump: Option<f64>,
-    tags: Vec<String>,
+fn has_entry_today(goal: &GoalSummary) -> bool {
+    // TODO: Use Beeminder timezone here!
+    let today = (OffsetDateTime::now_utc() - Duration::hours(6)).date();
+    goal.lastday.date() == today
 }
 
-impl Goal {
-    pub fn has_entry_today(&self) -> bool {
-        let lastday_datetime = Local.timestamp_opt(self.lastday, 0).unwrap().date_naive();
-        let today_datetime = Local::now().date_naive();
-        lastday_datetime == today_datetime
-    }
-}
+fn format_goal(goal: &GoalSummary) -> String {
+    let has_entry_today = if has_entry_today(goal) { "✓" } else { " " };
+    let slug_padded = format!("{:20}", goal.slug);
 
-impl fmt::Display for Goal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let has_entry_today = if self.has_entry_today() { "✓" } else { " " };
-        let slug_padded = format!("{:20}", self.slug);
+    let color = match goal.safebuf {
+        0 => Color::Red,
+        1 => Color::Yellow,
+        2 => Color::Blue,
+        3..=6 => Color::Green,
+        _ => Color::White,
+    };
 
-        let color = match self.safebuf {
-            0 => Color::Red,
-            1 => Color::Yellow,
-            2 => Color::Blue,
-            3..=6 => Color::Green,
-            _ => Color::White,
-        };
-
-        let colored_output =
-            format!("{} {} [{}]", has_entry_today, slug_padded, self.limsum).color(color);
-
-        write!(f, "{}", colored_output)
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Default)]
-pub struct DataPoint {
-    value: f64,
-    timestamp: Option<i64>,   // Defaults to "now" if none is passed in.
-    daystamp: Option<String>, // Optional, timestamp takes precedence if both are included.
-    comment: Option<String>,  // Optional.
-    requestid: Option<String>, /* Optional unique id for datapoint, acts as an idempotency key.
-                              Used for verifying if Beeminder received a datapoint and
-                              preventing duplicates.*/
-}
-
-async fn add_datapoint(
-    client: &Client,
-    config: &Config,
-    goal_slug: &str,
-    datapoint: &DataPoint,
-) -> Result<()> {
-    let url = format!(
-        "{}/users/me/goals/{}/datapoints.json?auth_token={}",
-        BASE_URL, goal_slug, config.key
-    );
-    let update_json = serde_json::to_string(&datapoint)?;
-    let body = reqwest::Body::from(update_json);
-    let resp = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .body(body)
-        .send()
-        .await?;
-    let _body = resp.text().await?;
-    // println!("Response: {:?}", body);
-    Ok(())
+    format!("{} {} [{}]", has_entry_today, slug_padded, goal.limsum)
+        .color(color)
+        .to_string()
 }
 
 #[tokio::main]
@@ -120,15 +61,14 @@ async fn main() -> Result<()> {
         .try_deserialize::<Config>()
         .with_context(|| "Could not read config.".to_string())?;
 
-    let client = Client::new();
+    let client = BeeminderClient::new(config.key);
     let command = Command::from_args();
     match command {
         Command::List => {
-            let url = format!("{}/users/me/goals.json?auth_token={}", BASE_URL, config.key);
-            let mut goals: Vec<Goal> = client.get(&url).send().await?.json().await?;
+            let mut goals: Vec<GoalSummary> = client.get_goals("me").await?;
 
             goals.sort_by(|a, b| {
-                let today_cmp = a.has_entry_today().cmp(&b.has_entry_today());
+                let today_cmp = has_entry_today(a).cmp(&has_entry_today(b));
                 if today_cmp != std::cmp::Ordering::Equal {
                     return today_cmp;
                 }
@@ -137,7 +77,7 @@ async fn main() -> Result<()> {
             });
 
             for goal in goals {
-                println!("{}", goal);
+                println!("{}", format_goal(&goal));
             }
         }
         Command::Add {
@@ -145,12 +85,11 @@ async fn main() -> Result<()> {
             value,
             comment,
         } => {
-            let datapoint = DataPoint {
-                value,
-                comment: comment.map(String::from),
-                ..Default::default()
-            };
-            add_datapoint(&client, &config, &goal, &datapoint).await?;
+            let mut dp = CreateDatapoint::new(value);
+            if let Some(comment) = comment {
+                dp = dp.with_comment(&comment);
+            }
+            client.create_datapoint("me", &goal, &dp).await?;
         }
     }
 
