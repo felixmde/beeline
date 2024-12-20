@@ -7,8 +7,6 @@ edition = "2021"
 anyhow = { version = "1.0" }
 beeminder-rs = { git = "https://git.felixm.de/felixm/beeminder-rs.git", branch = "main" }
 colored = "^2.0"
-config = { version = "0.13.3" }
-serde = { version = "^1", features = ["derive"] }
 structopt = "^0.3"
 time = { version = "0.3", features = ["serde", "macros"] }
 tokio = { version = "^1.42", features = ["full"] }

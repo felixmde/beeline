@@ -2,14 +2,8 @@ use anyhow::{Context, Result};
 use beeminder::types::{CreateDatapoint, GoalSummary};
 use beeminder::BeeminderClient;
 use colored::{Color, Colorize};
-use serde::Deserialize;
 use structopt::StructOpt;
 use time::{Duration, OffsetDateTime};
-
-#[derive(Deserialize, Debug)]
-struct Config {
-    key: String,
-}
 
 #[derive(StructOpt)]
 enum Command {
@@ -51,17 +45,10 @@ fn format_goal(goal: &GoalSummary) -> String {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let settings = config::Config::builder()
-        .add_source(config::File::with_name("settings"))
-        .add_source(config::Environment::with_prefix("BEELINE"))
-        .build()
-        .with_context(|| "Could not load config.".to_string())?;
+    let api_key = std::env::var("BEEMINDER_API_KEY")
+        .with_context(|| "Please create environment variable BEEMINDER_API_KEY".to_string())?;
 
-    let config = settings
-        .try_deserialize::<Config>()
-        .with_context(|| "Could not read config.".to_string())?;
-
-    let client = BeeminderClient::new(config.key);
+    let client = BeeminderClient::new(api_key);
     let command = Command::from_args();
     match command {
         Command::List => {
