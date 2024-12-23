@@ -91,7 +91,7 @@ dependencies = [
 [[package]]
 name = "beeminder-rs"
 version = "0.1.0"
-source = "git+https://git.felixm.de/felixm/beeminder-rs.git?branch=main#2d60bf7c45de9c9010201b6100611d82dcbb3622"
+source = "git+https://github.com/felixmde/beeminder-rs.git?branch=main#2d60bf7c45de9c9010201b6100611d82dcbb3622"
 dependencies = [
  "reqwest",
  "serde",

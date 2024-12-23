@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { version = "1.0" }
-beeminder-rs = { git = "https://git.felixm.de/felixm/beeminder-rs.git", branch = "main" }
+beeminder-rs = { git = "https://github.com/felixmde/beeminder-rs.git", branch = "main" }
 colored = "^2.0"
 structopt = "^0.3"
 time = { version = "0.3", features = ["serde", "macros"] }

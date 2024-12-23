@@ -11,7 +11,7 @@ dependencies?
 Clone the repository and run the tool using Cargo:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/felixmde/beeline
 cd beeline
 cargo run
 ```
