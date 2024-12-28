@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     let command = Command::from_args();
     match command {
         Command::List => {
-            let mut goals: Vec<GoalSummary> = client.get_goals("me").await?;
+            let mut goals: Vec<GoalSummary> = client.get_goals().await?;
 
             goals.sort_by(|a, b| {
                 let today_cmp = has_entry_today(a).cmp(&has_entry_today(b));
@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
             if let Some(comment) = comment {
                 dp = dp.with_comment(&comment);
             }
-            client.create_datapoint("me", &goal, &dp).await?;
+            client.create_datapoint(&goal, &dp).await?;
         }
     }
 
