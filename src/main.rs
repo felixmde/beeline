@@ -3,7 +3,7 @@ use beeminder::types::{CreateDatapoint, GoalSummary};
 use beeminder::BeeminderClient;
 use colored::{Color, Colorize};
 use structopt::StructOpt;
-use time::{Duration, OffsetDateTime};
+use time::{OffsetDateTime, UtcOffset};
 
 #[derive(StructOpt)]
 enum Command {
@@ -21,9 +21,12 @@ enum Command {
 }
 
 fn has_entry_today(goal: &GoalSummary) -> bool {
-    // TODO: Use Beeminder timezone here!
-    let today = (OffsetDateTime::now_utc() - Duration::hours(6)).date();
-    goal.lastday.date() == today
+    let now = OffsetDateTime::now_utc();
+    let today_date = match UtcOffset::current_local_offset() {
+        Ok(offset) => now.to_offset(offset).date(),
+        Err(_) => now.date(),
+    };
+    goal.lastday.date() == today_date
 }
 
 fn format_goal(goal: &GoalSummary) -> String {

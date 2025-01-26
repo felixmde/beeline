@@ -8,5 +8,5 @@ anyhow = { version = "1.0" }
 beeminder-rs = { git = "https://github.com/felixmde/beeminder-rs.git", branch = "main" }
 colored = "^2.0"
 structopt = "^0.3"
-time = { version = "0.3", features = ["serde", "macros"] }
+time = { version = "0.3", features = ["serde", "macros", "local-offset"] }
 tokio = { version = "^1.42", features = ["full"] }
