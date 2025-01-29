@@ -34,7 +34,7 @@ cargo run -- list
 To add a datapoint to a specific goal:
 
 ```bash
-cargo run -- add <goal_slug> <datapoint_value> [<comment_text>]
+cargo run -- add <goal> <datapoint_value> [<comment_text>]
 ```
 
 For example, to add a datapoint to a goal called 'fitness':
@@ -42,6 +42,17 @@ For example, to add a datapoint to a goal called 'fitness':
 ```bash
 cargo run -- add fitness 1.0 "worked out today"
 ```
+
+To edit recent datapoints for a goal:
+
+```bash
+cargo run -- edit <goal>
+```
+
+This opens your default editor (set via `EDITOR` environment variable) with the
+20 most recent datapoints in YAML format. You can modify values, timestamps, and
+comments. Removing a datapoint's entry will delete it, and adding new entries
+will create new datapoints.
 
 ## Contributing
 
