@@ -83,6 +83,8 @@ dependencies = [
  "anyhow",
  "beeminder-rs",
  "colored",
+ "serde",
+ "serde_json",
  "structopt",
  "tempfile",
  "time",
